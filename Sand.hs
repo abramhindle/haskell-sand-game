@@ -3,16 +3,16 @@ import GHC.Num
 import Graphics.UI.SDL as SDL
 import Graphics.UI.SDL.Image as Image
 import Monad
+import Particle
 
-maxHeight = 480
-maxWidth = 640
+maxHeight = 480 :: Int
+maxWidth = 640 :: Int
 
 background = "background.png"
 tinyBall = "ball10x10.png"
 
--- eventLoop :: IO ()
 
-data Particle = Dust Int Int 
+-- data Particle = Dust Int Int | Wall Int Int
 data Mousestate = Mouse { left :: Bool,
                           middle :: Bool,
                           right :: Bool,
@@ -28,6 +28,7 @@ data Gamestate = Game {
       gParticles :: [Particle]
     }
 
+roundInt = fromIntegral . toInteger . floor 
 
 sand_main = do
   SDL.init [InitEverything]
@@ -38,7 +39,7 @@ sand_main = do
   blitSurface back Nothing screen Nothing
   SDL.flip screen
   let startState = Game { gUpdate = True, gMouse = defaultMousestate , gParticles = [] }
-  let drawParticle (Dust x y) = blitSurface ball Nothing screen (Just (Rect x y 10 10))
+  let drawParticle (Dust x y) = blitSurface ball Nothing screen (Just (Rect (roundInt x) (roundInt y) 10 10))
   let drawFrame state = do
               blitSurface back Nothing screen Nothing
               Monad.sequence_ (map drawParticle $ gParticles state)
@@ -60,10 +61,14 @@ sand_main = do
                            eventLoop newstate
                     (MouseButtonUp x y ButtonLeft) -> do
                            eventLoop (state{ gMouse = ((gMouse state){left = False}) })
-                    (MouseButtonDown x y ButtonLeft) -> do
+                    (MouseButtonDown x y b@ButtonLeft) -> do
                            let rx = fromIntegral x
                            let ry = fromIntegral y
-                           eventLoop (addParticleToState ButtonLeft rx ry state)
+                           eventLoop (addParticleToState b rx ry state)
+                    (MouseButtonDown x y b@ButtonRight) -> do
+                           let rx = fromIntegral x
+                           let ry = fromIntegral y
+                           eventLoop (addWall b rx ry state)
 
                     (KeyDown (Keysym SDLK_ESCAPE _ _)) -> do 
                        print "Quitting"
@@ -74,11 +79,20 @@ sand_main = do
   eventLoop startState
 
 
-addParticleToState ButtonLeft rx ry state =
+genericAddParticleToState p ButtonLeft rx ry state =
     (state{ gUpdate = True, gMouse = mb,  gParticles = particles}) where
-        newParticle = Dust rx ry
+        newParticle = p (fromIntegral rx) (fromIntegral ry)
         particles = newParticle : (gParticles state)
         mb = (gMouse state){left = True}
+
+addParticleToState ButtonLeft rx ry state =
+    (state{ gUpdate = True, gMouse = mb,  gParticles = particles}) where
+        newParticle = Dust (fromIntegral rx) (fromIntegral ry)
+        particles = newParticle : (gParticles state)
+        mb = (gMouse state){left = True}
+
+
+    
 
 particleX (Dust x _) = x
 particleY (Dust x y) = y
@@ -86,8 +100,11 @@ particleXY (Dust x y) = (x,y)
 
 translateParticle x y (Dust x' y') = Dust (x + x') (y + y')
 
+isFixed Wall _ _ = True
+isFixed _ = False
+
 particleStateUpdate state = state{gUpdate = True, gParticles = filteredParticles } where
     translatedParticles = map (translateParticle 0 1) (gParticles state)
-    filteredParticles = filter (\x -> (particleY x < maxHeight)) translatedParticles
+    filteredParticles = filter (\x -> (particleY x < (fromIntegral maxHeight))) translatedParticles
 
 main = sand_main
