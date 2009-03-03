@@ -31,6 +31,8 @@ data Gamestate = Game {
       gFixedQuad ::  QuadTree Particle
     }
 
+      
+
 baseGameState = Game { gUpdate = True, gMouse = defaultMousestate, gParticles = [],
                   gFixed = [], gFixedQuad = Quad.empty}
 
@@ -43,6 +45,7 @@ sand_main = do
   back <- Image.load background
   ball <- Image.load tinyBall
   block <- Image.load tinyBlock
+
   blitSurface back Nothing screen Nothing
   SDL.flip screen
   let startState = baseGameState

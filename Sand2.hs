@@ -19,11 +19,12 @@ maxPixelWidth = 640 :: Int
 
 height = 48 
 width = 64
-spriteWidth = 10
-spriteHeight = 10
+spriteWidth = 10 :: Int
+spriteHeight = 10 :: Int
 background = "background.png"
 tinyBall = "ball10x10.png"
 tinyBlock = "block10x10.png"
+tinyBlank = "blank10x10.png"
 
 rand :: Int -> Int -> IO Int
 rand mi mx = getStdRandom (randomR (mi,mx))
@@ -31,19 +32,34 @@ rand mi mx = getStdRandom (randomR (mi,mx))
 -- btw a room is bottom to top
 -- bottom : row above bottom : ... : row above above .. : toprow : []
 
-emptyRoom = map (\y -> map (\x -> None) [1..width]) [1..height]
+emptyLine = replicate width None
+emptyRoom = Room (replicate height emptyLine)
+    
+
 
 data Room = Room [[Sand]]
 data World = World { currentSand :: Sand,
                      room :: Room
                    }
 
-emptyLine = map (\x -> None) [1..width]
+
 
 data Cursor = Cursor { center :: Sand,
                        left :: Sand,
                        right :: Sand,
                        above :: Sand }
+
+data SDLState = SDLState {
+      back :: Surface,
+      ball :: Surface,
+      block :: Surface,
+      blank :: Surface,
+      screen :: Surface
+    }
+
+
+
+
 
 getCursor (center:[]) (above:[]) lx =
     Cursor { center = center, left = lx, right = None, above = above }
@@ -86,36 +102,142 @@ sand_main = do
   back <- Image.load background
   ball <- Image.load tinyBall
   block <- Image.load tinyBlock
+  blank <- Image.load tinyBlank
+  let sdlstate = SDLState { back = back, ball = ball, block = block, blank = blank, screen = screen }
   blitSurface back Nothing screen Nothing
+  SDL.flip screen
+  let world = World { currentSand = Dust, room = emptyRoom }
+  eventLoop sdlstate world
   
 -- roomIteration world =
 
+drawStep s w = do
+  blitSurface (back s) Nothing (screen s) Nothing
+  drawWorld s (room w)
+  SDL.flip (screen s)
+  return ()
 
-processRow bottom top = processRowHelper None:bottom None:top
+eventLoop s ow = do
+  w <- step s ow
+  e <- pollEvent
+  case e of
+--     (MouseMotion x y _ _) -> do
+--                    let rx = fromIntegral x
+--                    let ry = fromIntegral y
+--                    let newstate = if (left (gMouse state)) 
+--                                  then (addParticleToState ButtonLeft rx ry state) 
+--                                  else if (right (gMouse state)) 
+--                                       then addWall ButtonRight rx ry state
+--                                       else state
+--                                            eventLoop newstate
+--     (MouseButtonUp x y b) -> do
+--                                         eventLoop (state{ gMouse = updateMouseUp b (gMouse state) })
+    (MouseButtonDown x y b@ButtonLeft) -> do
+      let rx = fromIntegral x
+      let ry = fromIntegral y
+      let newroom = insertParticle (room w) (currentSand w) rx ry 
+      eventLoop s (w{ room = newroom })
 
-processRowHelper helper  b@(bl:bh:mbs) t@(tl:th:mts) = do
-    let bs = (if (mbs == []) then [None] else bs)
-    let ts = if (mts == []) then [None] else bs
+    (KeyDown (Keysym SDLK_ESCAPE _ _)) -> do 
+      print "Quitting"
+      quit
+    Quit -> quit 
+    otherwise -> eventLoop s w
+
+
+insertParticle (Room room) sand x y =
+    let rx = (x `div` spriteWidth)
+        ry = height - 1 - (y `div` spriteHeight )
+        xhelper xc [] = error "xhelper not found!"
+        xhelper xc (l:ls) = 
+            if (xc == rx) 
+            then sand : ls
+            else l : (xhelper (xc + 1) ls)
+        yhelper yc [] = error "xhelper not found!"
+        yhelper yc (l:ls) =
+            if (yc == ry) 
+            then (xhelper 0 l) : ls
+            else l : (yhelper (yc - 1) ls)
+        newroom = yhelper (height - 1) room
+    in (Room newroom)
+                              
+    
+
+
+
+step s w = do
+  drawStep s w
+  newroom <- roomIter (room w)
+  return w -- (w{ room = newroom })
+
+getSprite s None = blank s    
+getSprite s LightDust = ball s
+getSprite s Dust = ball s
+getSprite s Wall = block s
+
+drawElm s None  screen i j = return True
+drawElm s t  screen i j = blitSurface (getSprite s t) Nothing screen (Just (Rect (spriteWidth*i) (spriteHeight * j) spriteWidth spriteHeight))
+
+
+drawWorld s (Room room) = do  
+  let scr = screen s
+  Monad.sequence_ (map 
+                   (\(i,row) ->
+                    Monad.sequence_ (map 
+                                     (\(j,elm) -> drawElm s elm scr j i)
+                                     (zip [0..] row)))
+                   (zip [0..] room))
+  
+    
+
+
+
+
+processRow bottom top = do
+  processRowHelper (None:bottom) (None:top)
+
+-- Some bug in here.. show stopper
+
+processRowHelper :: [Sand] -> [Sand] -> IO ([Sand],[Sand])
+
+processRowHelper  (b@(bl:bh:[])) (t@(tl:th:[])) = do
+
+    let bs =  [None]
+    let ts =  [None] 
     let cursor = getCursor (bh:bs) (th:ts) bl
     newCursor <- handleCursor cursor 
     let newLeft = left newCursor
     let newAbove = above newCursor
     let newCenter = center newCursor
-    let (nb,nt) = if (mbs == []) 
-                  then ([],[])
-                  else do return (processRowHelper bh:mbs th:mts)
-    return (newLeft:newCenter:nb , tl:newAbove:nt)
+    return ((newLeft:newCenter:[]), (tl:newAbove:[]))
 
-            
-            
-    
+processRowHelper  (b@(bl:bh:mbs)) (t@(tl:th:mts)) = do
 
-roomIter room = newroom where
-    helper (bottom:[])     = b : []
-        where (b,t) = processRow bottom emptyLine
-    helper (bottom:top:xs) = b : (helper (t:xs))
-        where (b,t) = processRow bottom top
-    (_ : newroom ) = helper emptyLine : room
+
+    let (bs,ts) = (mbs,mts)
+    let cursor = getCursor (bh:bs) (th:ts) bl
+    newCursor <- handleCursor cursor 
+    let newLeft = left newCursor
+    let newAbove = above newCursor
+    let newCenter = center newCursor
+    (nb,nt) <- processRowHelper (bh:mbs) (th:mts)
+    return (newLeft:newCenter:nb , tl:newAbove:nt)         
+
+processRowHelper  a b = error ("Match failure " ++ (show a) ++ " | " ++ (show b))
+
+
+roomIter (Room room) = do
+  (_ : newroom ) <- helper (emptyLine : room)
+  return (Room newroom)
+  where
+    helper (bottom:[]) = do
+                          (b,t) <- processRow bottom emptyLine
+                          return (b:[])
+    helper (bottom:top:xs) = do 
+                          (b,t) <- processRow bottom top 
+                          h <- helper (t:xs)
+                          return (b : h)
+  
     
     
 
