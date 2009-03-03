@@ -192,15 +192,22 @@ drawWorld s (Room room) = do
 
 
 
-
+data Caller = FirstOne | SecondOne | ProcessRow deriving Show
 processRow bottom top = do
-  processRowHelper (None:bottom) (None:top)
+  ass <-  if (not (length bottom == length top)) 
+          then (error ("processRow: Length unequal " ++ (show bottom) ++ " | " ++ (show top)))
+          else return True
+
+  (_:b,_:t) <- processRowHelper ProcessRow (None:bottom) (None:top)
+  return (b,t)
 
 -- Some bug in here.. show stopper
 
-processRowHelper :: [Sand] -> [Sand] -> IO ([Sand],[Sand])
 
-processRowHelper  (b@(bl:bh:[])) (t@(tl:th:[])) = do
+
+processRowHelper :: Caller -> [Sand] -> [Sand] -> IO ([Sand],[Sand])
+
+processRowHelper caller (b@(bl:bh:[])) (t@(tl:th:[])) = do
 
     let bs =  [None]
     let ts =  [None] 
@@ -211,8 +218,10 @@ processRowHelper  (b@(bl:bh:[])) (t@(tl:th:[])) = do
     let newCenter = center newCursor
     return ((newLeft:newCenter:[]), (tl:newAbove:[]))
 
-processRowHelper  (b@(bl:bh:mbs)) (t@(tl:th:mts)) = do
-
+processRowHelper caller (b@(bl:bh:mbs)) (t@(tl:th:mts)) = do
+    ass <-  if (not (length b == length t)) 
+            then (error ("Length unequal " ++ (show b) ++ " | " ++ (show t)))
+            else return True
 
     let (bs,ts) = (mbs,mts)
     let cursor = getCursor (bh:bs) (th:ts) bl
@@ -220,21 +229,38 @@ processRowHelper  (b@(bl:bh:mbs)) (t@(tl:th:mts)) = do
     let newLeft = left newCursor
     let newAbove = above newCursor
     let newCenter = center newCursor
-    (nb,nt) <- processRowHelper (bh:mbs) (th:mts)
-    return (newLeft:newCenter:nb , tl:newAbove:nt)         
+    (nb,nt) <- processRowHelper SecondOne (newCenter:mbs) (newAbove:mts)
+    return ((newLeft:nb) , (tl:nt))         
 
-processRowHelper  a b = error ("Match failure " ++ (show a) ++ " | " ++ (show b))
+processRowHelper caller a b = error ("Match failure " ++ (show caller)  ++ "> " ++ (show a) ++ " | " ++ (show b))
 
+roomCheck (Room room) = length room == height && helper room where
+    helper ([]) = True
+    helper (x:xs) = if (length x == width) 
+                    then helper xs
+                    else (error ("Too short! " ++ (show (length x)) ++ " : " ++ (show x)))
 
-roomIter (Room room) = do
+roomIter r@(Room room) = do
+  v <- return (roomCheck r)
   (_ : newroom ) <- helper (emptyLine : room)
   return (Room newroom)
   where
     helper (bottom:[]) = do
-                          (b,t) <- processRow bottom emptyLine
-                          return (b:[])
+                         ass <-  if (not (length bottom == length emptyLine)) 
+                                 then (error ("Last Helper Length unequal " ++ (show bottom) ++ " | " ++ (show emptyLine)))
+                                 else return True
+                         (b,t) <- processRow bottom emptyLine
+                         return (b:[])
     helper (bottom:top:xs) = do 
+                          ass <-  if (not (length bottom == length top)) 
+                                  then (error ("helper:  Length unequal " ++ (show (length bottom))  ++ " " ++ (show ( length top )) ++ " " ++ (show bottom) ++ " | " ++ (show emptyLine)))
+                                  else return True
+
                           (b,t) <- processRow bottom top 
+                          ass <-  if (not (length b == length t) || (not (length t == length top))) 
+                                  then (error ("helper after processRow:  Length unequal " ++ (show (length b))  ++ " " ++ (show ( length t))))
+                                  else return True
+
                           h <- helper (t:xs)
                           return (b : h)
   
