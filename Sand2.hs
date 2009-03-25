@@ -20,14 +20,14 @@ isFixed _ = False
 -- Dumb Hack
 weight x = fromEnum x
 
-maxPixelHeight = 480 :: Int
-maxPixelWidth = 640 :: Int
+maxPixelHeight = 768 :: Int
+maxPixelWidth = 1024 :: Int
 
-height = 48 
-width = 64
+height = 76
+width = 102
 spriteWidth = 10 :: Int
 spriteHeight = 10 :: Int
-background = "background.png"
+background = "background1024x768.png"
 tinyBall = "ball10x10.png"
 tinyGreenBall = "greenball10x10.png"
 tinyBlock = "block10x10.png"
