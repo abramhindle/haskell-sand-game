@@ -148,8 +148,8 @@ cursorLogic c@(Cursor { center = None, above = Dust }) = maybeSink c
 cursorLogic c@(Cursor { center = None, above = LightDust }) =  maybeSink c
 cursorLogic c@(Cursor { center = None, above = DustGenerator }) =  maybeSink c
 cursorLogic c@(Cursor { above = LightDust, center = DustGenerator }) =  maybeSink c
-cursorLogic c@(Cursor { center = None, above = ListDustGenerator }) =  maybeSink c
-cursorLogic c@(Cursor { above = LightDust, center = ListDustGenerator }) =  maybeSink c
+cursorLogic c@(Cursor { center = None, above = LightDustGenerator }) =  maybeSink c
+cursorLogic c@(Cursor { above = LightDust, center = LightDustGenerator }) =  maybeSink c
 
 
 
@@ -275,7 +275,7 @@ sand_main = do
                             acidball = acidball, 
                             eater = eater,
                             lightdustgen = lightdustgen,
-                            dustgen = dustgen,
+                            dustgen = dustgen
                           }
   blitSurface back Nothing screen Nothing
   SDL.flip screen
@@ -355,7 +355,6 @@ insertParticle (Room room) sand x y =
     
 
 
-
 step w = do
   s <- getSDLState
   io $ drawStep s w
@@ -368,7 +367,7 @@ spriteAcc None =  blank
 spriteAcc LightDust = greenball 
 spriteAcc Dust = ball
 spriteAcc DustGenerator = dustgen
-spriteAcc LighDustGenerator = lightdustgen
+spriteAcc LightDustGenerator = lightdustgen
 spriteAcc Wall = block
 spriteAcc Eater = eater
 spriteAcc Acid = acidball
