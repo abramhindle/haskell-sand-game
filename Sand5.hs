@@ -13,10 +13,10 @@ import Harbinger
 
 
 -- Roll between 1 and n
-roll :: Int -> StateT Harbinger IO Int
-roll n = io $ getStdRandom (randomR (1,n))
+roll :: Int -> IO Int
+roll n = getStdRandom (randomR (1,n))
 
-decide :: Int -> Int -> StateT Harbinger IO Bool
+decide :: Int -> Int -> IO Bool
 decide n k = do
   v <- roll k
   return (v <= n)
@@ -160,7 +160,9 @@ cursorLogic c@(Cursor { center = LightDust, above = Dust }) = maybeSink c
 cursorLogic c = return $ c
 
 ourDecision :: StateT Harbinger IO Bool
-ourDecision = decide 1 2
+ourDecision = do
+    v <- io $ decide 1 2
+    return v
 
 -- decideOn :: (Cursor -> StateT Harbinger IO Cursor) -> Cursor -> StateT Harbinger IO Cursor
 decideOn f c = do
