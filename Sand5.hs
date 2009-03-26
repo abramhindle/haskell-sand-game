@@ -24,7 +24,7 @@ decide n k = do
   v <- roll k
   return (v <= n)
 
-data Sand = None | DustGenerator | LightDust | Dust | Eater | Wall | Acid 
+data Sand = None | LightDustGenerator | DustGenerator | LightDust | Dust | Eater | Wall | Acid 
             deriving (Enum,Eq,Ord,Show)
 
 nextSand Acid = None
@@ -55,6 +55,8 @@ tinyBlock = "block10x10.png"
 tinyEater = "eater10x10.png"
 tinyBlank = "blank10x10.png"
 acidBall = "acidball10x10.png"
+dustGenSpr = "dustgen10x10.png"
+lightdustGenSpr = "lightdustgen10x10.png"
 
 rand :: Int -> Int -> IO Int
 rand mi mx = getStdRandom (randomR (mi,mx))
@@ -90,6 +92,8 @@ data SDLState = SDLState {
       block :: Surface,
       eater :: Surface,
       blank :: Surface,
+      dustgen :: Surface,
+      lightdustgen :: Surface,
       screen :: Surface
     }
 
@@ -135,6 +139,8 @@ cursorLogic :: Cursor -> StateT X IO Cursor
 cursorLogic c@(Cursor { center = Eater, above = Dust }) = eatAboveSendMessage c 
 cursorLogic c@(Cursor { center = Eater, above = LightDust }) = eatAboveSendMessage c 
 cursorLogic c@(Cursor { center = Eater, above = Acid }) = eatAboveSendMessage c 
+cursorLogic c@(Cursor { center = Eater, above = DustGenerator }) = eatAboveSendMessage c 
+cursorLogic c@(Cursor { center = Eater, above = LightDustGenerator }) = eatAboveSendMessage c 
 
 cursorLogic c@(Cursor { above = Acid }) =  maybeSink c
 
@@ -142,9 +148,13 @@ cursorLogic c@(Cursor { center = None, above = Dust }) = maybeSink c
 cursorLogic c@(Cursor { center = None, above = LightDust }) =  maybeSink c
 cursorLogic c@(Cursor { center = None, above = DustGenerator }) =  maybeSink c
 cursorLogic c@(Cursor { above = LightDust, center = DustGenerator }) =  maybeSink c
+cursorLogic c@(Cursor { center = None, above = ListDustGenerator }) =  maybeSink c
+cursorLogic c@(Cursor { above = LightDust, center = ListDustGenerator }) =  maybeSink c
 
 
-cursorLogic c@(Cursor { center = DustGenerator, above = None }) = return $ c{above = LightDust }
+
+cursorLogic c@(Cursor { center = DustGenerator, above = None }) = return $ c{above = Dust }
+cursorLogic c@(Cursor { center = LightDustGenerator, above = None }) = return $ c{above = LightDust }
 
 cursorLogic c@(Cursor { left = None, right = None, above = LightDust }) =  sinkLeftOrRight c
 
@@ -252,8 +262,21 @@ sand_main = do
   acidball <- Image.load acidBall
   block <- Image.load tinyBlock
   eater <- Image.load tinyEater
+  lightdustgen <- Image.load lightdustGenSpr
+  dustgen <- Image.load dustGenSpr
   blank <- Image.load tinyBlank
-  let sdlstate = SDLState { leftButton = False, back = back, ball = ball, block = block, blank = blank, screen = screen, greenball = greenball, acidball = acidball, eater = eater }
+  let sdlstate = SDLState { leftButton = False, 
+                            back = back, 
+                            ball = ball, 
+                            block = block, 
+                            blank = blank, 
+                            screen = screen, 
+                            greenball = greenball, 
+                            acidball = acidball, 
+                            eater = eater,
+                            lightdustgen = lightdustgen,
+                            dustgen = dustgen,
+                          }
   blitSurface back Nothing screen Nothing
   SDL.flip screen
   let world = World { currentSand = Dust, room = emptyRoom }
@@ -344,7 +367,8 @@ getSprite s x =  (spriteAcc x) s
 spriteAcc None =  blank
 spriteAcc LightDust = greenball 
 spriteAcc Dust = ball
-spriteAcc DustGenerator = ball
+spriteAcc DustGenerator = dustgen
+spriteAcc LighDustGenerator = lightdustgen
 spriteAcc Wall = block
 spriteAcc Eater = eater
 spriteAcc Acid = acidball
