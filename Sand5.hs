@@ -10,7 +10,10 @@ import Harbinger
 -- The sand game but with random numbers
 -- Not as painful as I expected
 
+-- This is the container for the state
 
+
+type X = OurState
 
 -- Roll between 1 and n
 roll :: Int -> IO Int
@@ -90,6 +93,10 @@ data SDLState = SDLState {
       screen :: Surface
     }
 
+data OurState = OurState { harbinger :: Harbinger,
+                           sdlstate  :: SDLState
+                         }
+
 
 
 
@@ -124,7 +131,7 @@ eatAboveSendMessage c@(Cursor { pos = (x,y), above = above}) = do
     io $ print eatstr
     return $ eatAbove c
 
-cursorLogic :: Cursor -> StateT Harbinger IO Cursor
+cursorLogic :: Cursor -> StateT X IO Cursor
 cursorLogic c@(Cursor { center = Eater, above = Dust }) = eatAboveSendMessage c 
 cursorLogic c@(Cursor { center = Eater, above = LightDust }) = eatAboveSendMessage c 
 cursorLogic c@(Cursor { center = Eater, above = Acid }) = eatAboveSendMessage c 
@@ -159,7 +166,7 @@ cursorLogic c@(Cursor { center = LightDust, above = Dust }) = maybeSink c
 
 cursorLogic c = return $ c
 
-ourDecision :: StateT Harbinger IO Bool
+ourDecision :: StateT X IO Bool
 ourDecision = do
     v <- io $ decide 1 2
     return v
@@ -251,16 +258,16 @@ sand_main = do
   SDL.flip screen
   let world = World { currentSand = Dust, room = emptyRoom }
   harbinger <- makeDefaultHarbinger "Sand5"
-  runStateT  (startWorld sdlstate world) harbinger
+  runStateT  (startWorld world) (OurState { harbinger = harbinger, sdlstate = sdlstate })
   return ()
 
 --  evalState $ do 
 --              put harbinger
 --              do eventLoop sdlstate world
   
-startWorld :: SDLState -> World -> StateT Harbinger IO ()
-startWorld sdlstate world = do
-   eventLoop sdlstate world
+startWorld :: World -> StateT X IO ()
+startWorld world = do
+   eventLoop world
 
 -- roomIteration world =
 
@@ -272,35 +279,38 @@ drawStep s w = do
   return ()
 
 -- eventLoop :: SDLState -> World ->  IO ()
-eventLoop s ow = do
-  w <-  step s ow
+eventLoop ow = do
+  w <-  step ow
   e <- io $ pollEvent
+  s <- getSDLState
   case e of
     (MouseMotion x y _ _) -> do
                    let rx = fromIntegral x
                    let ry = fromIntegral y
-                   eventLoop s (if (leftButton s) 
+                   eventLoop (if (leftButton s) 
                                 then (w{ room = (insertParticle (room w) (currentSand w) rx ry ) })
                                 else w)
     (MouseButtonUp x y ButtonLeft) -> do
-                   eventLoop (s{ leftButton = False }) w
+                 updateSDLState (s{ leftButton = False })
+                 eventLoop  w
     (MouseButtonDown x y b@ButtonRight) -> do
-                   eventLoop s (w{ currentSand = nextSand (currentSand w) })
+                   eventLoop (w{ currentSand = nextSand (currentSand w) })
     (MouseButtonDown x y b@ButtonWheelDown) -> do
-                   eventLoop s (w{ currentSand = nextSand (currentSand w) })
+                   eventLoop (w{ currentSand = nextSand (currentSand w) })
     (MouseButtonDown x y b@ButtonWheelUp) -> do
-                   eventLoop s (w{ currentSand = nextSand (currentSand w) })
+                   eventLoop (w{ currentSand = nextSand (currentSand w) })
     (MouseButtonDown x y b@ButtonLeft) -> do
       let rx = fromIntegral x
       let ry = fromIntegral y
       let newroom = insertParticle (room w) (currentSand w) rx ry 
-      eventLoop (s{ leftButton = True }) (w{ room = newroom })
+      updateSDLState s{ leftButton = True }
+      eventLoop (w{ room = newroom })
 
     (KeyDown (Keysym SDLK_ESCAPE _ _)) -> do 
       io $ print "Quitting"
       io $ quit
     Quit -> io $ quit 
-    otherwise -> eventLoop s w
+    otherwise -> eventLoop w
 
 
 insertParticle (Room room) sand x y =
@@ -323,18 +333,21 @@ insertParticle (Room room) sand x y =
 
 
 
-step s w = do
+step w = do
+  s <- getSDLState
   io $ drawStep s w
   newroom <-  roomIter (room w)
   return (w{ room = newroom })
 
-getSprite s None = blank s    
-getSprite s LightDust = greenball s
-getSprite s Dust = ball s
-getSprite s DustGenerator = ball s
-getSprite s Wall = block s
-getSprite s Eater = eater s
-getSprite s Acid = acidball s
+getSprite s x =  (spriteAcc x) s
+
+spriteAcc None =  blank
+spriteAcc LightDust = greenball 
+spriteAcc Dust = ball
+spriteAcc DustGenerator = ball
+spriteAcc Wall = block
+spriteAcc Eater = eater
+spriteAcc Acid = acidball
 
 
 drawElm s None  screen i j = return True
@@ -351,10 +364,20 @@ drawWorld s (Room room) = do
                    (zip [0..] room))
   
     
-getHarbinger :: StateT Harbinger IO Harbinger
+getHarbinger :: StateT X IO Harbinger
 getHarbinger = do
   v <- get
-  return v
+  return (harbinger v)
+
+getSDLState :: StateT X IO SDLState
+getSDLState = do
+  v <- get
+  return (sdlstate v)
+
+updateSDLState s = do
+  v <- get
+  put (v{ sdlstate = s})
+
 
 
 
@@ -368,7 +391,7 @@ processRow h bottom top = do
 
 
 -- Takes 2 rows, processes, returns new changed rows - helps processRow
-processRowHelper :: (Int,Int) -> [Sand] -> [Sand] -> StateT Harbinger IO ([Sand],[Sand])
+processRowHelper :: (Int,Int) -> [Sand] -> [Sand] -> StateT X IO ([Sand],[Sand])
 
 processRowHelper (pos@(x,y)) (b@(bl:bh:[])) (t@(tl:th:[])) = do
     let bs =  [None]
@@ -415,8 +438,7 @@ roomIter r@(Room room) = do
     
     
 
-io :: IO a -> StateT Harbinger IO a
+io :: IO a -> StateT X IO a
 io = liftIO
-
     
 main = sand_main
