@@ -13,10 +13,10 @@ import Harbinger
 
 
 -- Roll between 1 and n
-roll :: Int -> IO Int
-roll n = getStdRandom (randomR (1,n))
+roll :: Int -> StateT Harbinger IO Int
+roll n = io $ getStdRandom (randomR (1,n))
 
-decide :: Int -> Int -> IO Bool
+decide :: Int -> Int -> StateT Harbinger IO Bool
 decide n k = do
   v <- roll k
   return (v <= n)
@@ -117,30 +117,31 @@ sinkRight c@(Cursor { center = center, left = left, right = right, above = above
 eatAbove c = c{above = None }
 
 eatAboveSendMessage c@(Cursor { pos = (x,y), above = above}) = do
-    h <- get
-    v <- harbingerSend h (concat ["Eaten at ",(show x)," ",(show y)," ",(show above)])
+    h <- getHarbinger
+    let eatstr = (concat ["Eaten at ",(show x)," ",(show y)," ",(show above)])
+    v <- io $ harbingerSend h eatstr
+    io $ print $ show v
+    io $ print eatstr
     return $ eatAbove c
 
--- cursorLogic :: Cursor -> IO Cursor
-cursorLogic c@(Cursor { center = Eater, above = Dust }) = return $ eatAbove c
-cursorLogic c@(Cursor { center = Eater, above = LightDust }) = return $ eatAbove c
-cursorLogic c@(Cursor { center = Eater, above = Acid }) = return $ eatAbove c
+cursorLogic :: Cursor -> StateT Harbinger IO Cursor
+cursorLogic c@(Cursor { center = Eater, above = Dust }) = eatAboveSendMessage c 
+cursorLogic c@(Cursor { center = Eater, above = LightDust }) = eatAboveSendMessage c 
+cursorLogic c@(Cursor { center = Eater, above = Acid }) = eatAboveSendMessage c 
 
-cursorLogic c@(Cursor { above = Acid }) = maybeSink c
+cursorLogic c@(Cursor { above = Acid }) =  maybeSink c
 
 cursorLogic c@(Cursor { center = None, above = Dust }) = maybeSink c
-cursorLogic c@(Cursor { center = None, above = LightDust }) = maybeSink c
-cursorLogic c@(Cursor { center = None, above = DustGenerator }) = maybeSink c
-cursorLogic c@(Cursor { above = LightDust, center = DustGenerator }) = maybeSink c
+cursorLogic c@(Cursor { center = None, above = LightDust }) =  maybeSink c
+cursorLogic c@(Cursor { center = None, above = DustGenerator }) =  maybeSink c
+cursorLogic c@(Cursor { above = LightDust, center = DustGenerator }) =  maybeSink c
 
 
 cursorLogic c@(Cursor { center = DustGenerator, above = None }) = return $ c{above = LightDust }
 
-cursorLogic c@(Cursor { left = None, right = None, above = LightDust }) = sinkLeftOrRight c
+cursorLogic c@(Cursor { left = None, right = None, above = LightDust }) =  sinkLeftOrRight c
 
-cursorLogic c@(Cursor { left = None, right = None, above = Dust }) = sinkLeftOrRight c
-  
-
+cursorLogic c@(Cursor { left = None, right = None, above = Dust }) =  sinkLeftOrRight c
 cursorLogic c@(Cursor { right = None, above = Dust }) = maybeSinkRight c
 cursorLogic c@(Cursor { right = None, above = LightDust }) =  maybeSinkRight c
 
@@ -158,10 +159,10 @@ cursorLogic c@(Cursor { center = LightDust, above = Dust }) = maybeSink c
 
 cursorLogic c = return $ c
 
-ourDecision :: IO Bool
+ourDecision :: StateT Harbinger IO Bool
 ourDecision = decide 1 2
 
-decideOn :: (Cursor -> IO Cursor) -> Cursor -> IO Cursor
+-- decideOn :: (Cursor -> StateT Harbinger IO Cursor) -> Cursor -> StateT Harbinger IO Cursor
 decideOn f c = do
     v <- ourDecision
     o <- if v 
@@ -171,29 +172,29 @@ decideOn f c = do
     return o
            
                     
-sinkLeftOrRight :: Cursor -> IO Cursor
+-- sinkLeftOrRight :: Cursor -> StateT Harbinger IO Cursor
 sinkLeftOrRight = decisionBranch sinkLeft sinkRight
 
-bumpLeftOrRight :: Cursor -> IO Cursor
+-- bumpLeftOrRight :: Cursor -> StateT Harbinger IO Cursor
 bumpLeftOrRight = decisionBranch bumpLeft bumpRight
 
-maybeBumpLeft :: Cursor -> IO Cursor
+-- maybeBumpLeft :: Cursor -> StateT Harbinger IO Cursor
 maybeBumpLeft = decisionBranch id bumpLeft
 
-maybeBumpRight :: Cursor -> IO Cursor
+-- maybeBumpRight :: Cursor -> StateT Harbinger IO Cursor
 maybeBumpRight = decisionBranch id bumpRight
 
-maybeSinkLeft :: Cursor -> IO Cursor
+-- maybeSinkLeft :: Cursor -> StateT Harbinger IO Cursor
 maybeSinkLeft = decisionBranch id sinkLeft
 
-maybeSinkRight :: Cursor -> IO Cursor
+-- maybeSinkRight :: Cursor -> StateT Harbinger IO Cursor
 maybeSinkRight = decisionBranch id sinkRight
 
 
-maybeSink :: Cursor -> IO Cursor
+-- maybeSink :: Cursor -> StateT Harbinger IO Cursor
 maybeSink = decisionBranch id sink
 
-decisionBranch :: (Cursor -> Cursor) -> (Cursor -> Cursor) -> Cursor -> IO Cursor
+-- decisionBranch :: (Cursor -> Cursor) -> (Cursor -> Cursor) -> Cursor -> StateT Harbinger IO Cursor
 decisionBranch ft ff c = do
     decision <- ourDecision
     return $ if decision 
@@ -211,7 +212,7 @@ decisionBranch ft ff c = do
 --                           then bumpLeft c
 --                           else c
 
-handleCursor :: Cursor -> IO Cursor 
+-- handleCursor :: Cursor -> StateT Harbinger IO Cursor 
 handleCursor c@(Cursor { center = center, left = left, right = right, above = above }) =
     cursorLogic c
     
@@ -232,7 +233,6 @@ handleCursor c@(Cursor { center = center, left = left, right = right, above = ab
 
 
 sand_main = do
-  harbinger <- makeDefaultHarbinger "Sand5"
   newStdGen
   SDL.init [InitEverything]
   setVideoMode maxPixelWidth maxPixelHeight 32 []
@@ -248,17 +248,17 @@ sand_main = do
   blitSurface back Nothing screen Nothing
   SDL.flip screen
   let world = World { currentSand = Dust, room = emptyRoom }
-  evalStateT (startWorld sdlstate world harbinger)
+  harbinger <- makeDefaultHarbinger "Sand5"
+  runStateT  (startWorld sdlstate world) harbinger
+  return ()
 
 --  evalState $ do 
 --              put harbinger
 --              do eventLoop sdlstate world
   
-startWorld :: SDLState -> World -> Harbinger -> StateT Harbinger IO ()
-startWorld sdlstate world harbinger =
-    do
-      put harbinger
-      lift (eventLoop sdlstate world)
+startWorld :: SDLState -> World -> StateT Harbinger IO ()
+startWorld sdlstate world = do
+   eventLoop sdlstate world
 
 -- roomIteration world =
 
@@ -271,8 +271,8 @@ drawStep s w = do
 
 -- eventLoop :: SDLState -> World ->  IO ()
 eventLoop s ow = do
-  w <- step s ow
-  e <- pollEvent
+  w <-  step s ow
+  e <- io $ pollEvent
   case e of
     (MouseMotion x y _ _) -> do
                    let rx = fromIntegral x
@@ -295,9 +295,9 @@ eventLoop s ow = do
       eventLoop (s{ leftButton = True }) (w{ room = newroom })
 
     (KeyDown (Keysym SDLK_ESCAPE _ _)) -> do 
-      print "Quitting"
-      quit
-    Quit -> quit 
+      io $ print "Quitting"
+      io $ quit
+    Quit -> io $ quit 
     otherwise -> eventLoop s w
 
 
@@ -322,8 +322,8 @@ insertParticle (Room room) sand x y =
 
 
 step s w = do
-  drawStep s w
-  newroom <- roomIter (room w)
+  io $ drawStep s w
+  newroom <-  roomIter (room w)
   return (w{ room = newroom })
 
 getSprite s None = blank s    
@@ -349,6 +349,10 @@ drawWorld s (Room room) = do
                    (zip [0..] room))
   
     
+getHarbinger :: StateT Harbinger IO Harbinger
+getHarbinger = do
+  v <- get
+  return v
 
 
 
@@ -362,7 +366,7 @@ processRow h bottom top = do
 
 
 -- Takes 2 rows, processes, returns new changed rows - helps processRow
-processRowHelper :: (Int,Int) -> [Sand] -> [Sand] -> IO ([Sand],[Sand])
+processRowHelper :: (Int,Int) -> [Sand] -> [Sand] -> StateT Harbinger IO ([Sand],[Sand])
 
 processRowHelper (pos@(x,y)) (b@(bl:bh:[])) (t@(tl:th:[])) = do
     let bs =  [None]
@@ -409,6 +413,8 @@ roomIter r@(Room room) = do
     
     
 
+io :: IO a -> StateT Harbinger IO a
+io = liftIO
 
     
 main = sand_main

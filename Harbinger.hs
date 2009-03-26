@@ -10,7 +10,7 @@ data Harbinger = Harbinger { hname :: String,
 
 -- Setup a UDP ready socket to send on 
 makeHarbinger name id dest host port =
-  let rhost = if (host == "") then "localhost" else rhost
+  let rhost = if (host == "") then "127.0.0.1" else rhost
       rport = if (port == 0) then 15011 else port
       rid = id
       rdest = dest
@@ -19,12 +19,14 @@ makeHarbinger name id dest host port =
     rsock <- socket Net.AF_INET Datagram 0
     addr <- inet_addr rhost    
     let rserver = Net.SockAddrInet rport addr
-    return $ Harbinger { hname = name, 
-                         hid = rid, 
-                         hdest = rdest, 
-                         hsock = rsock, 
-                         hserver = rserver }
+    let out = Harbinger { hname = name, 
+                          hid = rid, 
+                          hdest = rdest, 
+                          hsock = rsock, 
+                          hserver = rserver }
+    return out
 
+makeDefaultHarbinger :: String -> IO Harbinger
 makeDefaultHarbinger programName = makeHarbinger programName "" "" "" 0
 
 harbingerSend harbinger msg =
