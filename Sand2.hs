@@ -2,8 +2,8 @@ import Prelude
 import GHC.Num
 import Graphics.UI.SDL as SDL
 import Graphics.UI.SDL.Image as Image
-import Monad
-import Random
+import Control.Monad as Monad
+import System.Random as Random
 
 
 data Sand = None | DustGenerator | LightDust | Dust | Wall | Acid 
@@ -318,3 +318,4 @@ roomIter r@(Room room) = do
 
     
 main = sand_main
+

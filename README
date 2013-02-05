@@ -1,0 +1,37 @@
+== Haskell Based Sand-Game sonified ==
+
+This is a haskell based sand game. I don't use arrays and I manage to deal with each pixel a couple of times in a linear fashion!
+
+So it is programmed functionally, unfortunately as I add features like communication and randomness it seems to get less fun as I begin to have crazy types such as StateT X IO ().
+
+Anyways, it uses SDL and you can use the mouse. The music is provided via cSound and perl.
+
+This sand game is just an automata game with some randomness. There is light dust, dust, blocks, acid (which pushes walls up), eaters (blocks which eat things on top of it), light dust generators and dust generators. You change which dust-type you currently have by right clicking.
+
+Browse the source code: https://github.com/abramhindle/haskell-sand-game
+get it from git: git clone git://github.com/abramhindle/haskell-sand-game.git
+Most worthwhile file to read: https://github.com/abramhindle/haskell-sand-game/blob/master/Sand5.hs
+
+to build try:
+{{{
+ ghc --make Sand.hs
+ ghc --make Sand2.hs
+ ghc --make Sand4.hs
+ ghc --make Sand5.hs
+}}}
+
+They are all different but related. 
+
+The music is produced via harbinger (in perl and csound) you run both Sand5 and sand5.pl
+
+{{http://churchturing.org/x/max4.gif}}
+Here's a 6mb animated gif of the sand game in action.
+
+=== Video ===
+
+Here's an avi: [http://churchturing.org/x/musical-sand-20090325.avi] [http://churchturing.org/x/sand-game-20090328.avi]
+Here's the same thing on youtube: [http://www.youtube.com/watch?v=xv_wITSdyoo]
+[http://www.youtube.com/watch?v=_u1MJbQQQYQ]
+
+
+http://softwareprocess.es/static/Sand-Game.html
