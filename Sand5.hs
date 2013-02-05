@@ -3,8 +3,8 @@ import GHC.Num
 import Graphics.UI.SDL as SDL
 import Graphics.UI.SDL.Image as Image
 import Control.Monad.State
-import Monad
-import Random
+import Control.Monad as Monad
+import System.Random as Random
 import Harbinger
 
 -- The sand game but with random numbers
