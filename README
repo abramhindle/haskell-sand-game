@@ -27,6 +27,12 @@ The music is produced via harbinger (in perl and csound) you run both Sand5 and 
 {{http://churchturing.org/x/max4.gif}}
 Here's a 6mb animated gif of the sand game in action.
 
+=== License ===
+
+(c) 2013 Abram Hindle 
+
+Under LGPL Version 3, please see LICENSE
+
 === Video ===
 
 Here's an avi: [http://churchturing.org/x/musical-sand-20090325.avi] [http://churchturing.org/x/sand-game-20090328.avi]
